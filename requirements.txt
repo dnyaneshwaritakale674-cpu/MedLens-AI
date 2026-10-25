@@ -1,0 +1,9 @@
+
+streamlit
+requests
+fastapi
+uvicorn
+transformers
+torch
+pillow
+reportlab
