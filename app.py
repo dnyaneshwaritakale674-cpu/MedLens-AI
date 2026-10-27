@@ -2,269 +2,285 @@
 
 import streamlit as st
 import requests
-import json
-from datetime import datetime
-from reportlab.lib.pagesizes import A4
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
-from reportlab.lib.styles import getSampleStyleSheet
 from io import BytesIO
-API_URL = "http://127.0.0.1:8000"
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfgen import canvas
+
+def create_pdf_report(item):
+    buffer = BytesIO()
+    pdf = canvas.Canvas(buffer, pagesize=A4)
+
+    width, height = A4
+    y = height - 60
+
+    pdf.setTitle("MedLens AI Technical Report")
+
+    pdf.setFont("Helvetica-Bold", 20)
+    pdf.drawString(50, y, "MedLens AI")
+    y -= 30
+
+    pdf.setFont("Helvetica-Bold", 14)
+    pdf.drawString(50, y, "Technical Processing Report")
+    y -= 35
+
+    pdf.setFont("Helvetica", 11)
+
+    details = [
+        f"Image filename: {item['filename']}",
+        f"AI Model: {item['model']}",
+        f"Processing time: {item['processing_time']} seconds",
+        f"Feature vector length: {item['feature_length']}",
+        f"Feature shape: {item.get('feature_shape', 'N/A')}",
+        "",
+        "Purpose: Research and technical demonstration.",
+        "",
+        "Safety notice:",
+        "This report contains technical processing information only.",
+        "RAD-DINO feature extraction does not provide a diagnosis.",
+        "Do not use these results for medical decisions."
+    ]
+
+    for line in details:
+        pdf.drawString(50, y, line)
+        y -= 22
+
+    pdf.save()
+    buffer.seek(0)
+
+    return buffer.getvalue()
 
 st.set_page_config(
-    page_title="MedLens AI | Medical Imaging",
+    page_title="MedLens AI",
     page_icon="🩺",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="expanded"
 )
 
+if "analysis_history" not in st.session_state:
+    st.session_state.analysis_history = []
+
+API_URL = "http://127.0.0.1:8000/analyze"
+
+# Professional styling
 st.markdown("""
 <style>
-.stApp {
-    background: linear-gradient(135deg, #f5f8fc 0%, #edf5f7 100%);
-}
-.block-container {
-    padding-top: 2rem;
-    padding-bottom: 3rem;
-    max-width: 1200px;
-}
-.hero {
-    padding: 30px;
-    border-radius: 22px;
-    background: linear-gradient(120deg, #102a43, #155e75);
-    color: white;
-    margin-bottom: 25px;
-}
-.hero h1 { color: white; font-size: 38px; margin-bottom: 8px; }
-.hero p { color: #d8edf5; font-size: 16px; }
-.eyebrow {
-    color: #5eead4;
-    font-size: 12px;
-    letter-spacing: 3px;
-    font-weight: 700;
-}
-.panel {
-    background: white;
-    border: 1px solid #dce6ee;
-    border-radius: 18px;
-    padding: 22px;
-    margin-bottom: 18px;
-}
-.small-note {
-    color: #526579;
-    font-size: 13px;
-}
-div.stButton > button {
-    border-radius: 10px;
-    min-height: 45px;
-    font-weight: 600;
-}
+    .stApp {
+        background-color: #f4f8fb;
+    }
+    .block-container {
+        padding-top: 2rem;
+        padding-bottom: 2rem;
+        max-width: 1200px;
+    }
+    .hero {
+        background: linear-gradient(120deg, #063b5c, #087e8b);
+        padding: 30px;
+        border-radius: 18px;
+        color: white;
+        margin-bottom: 25px;
+    }
+    .hero h1 {
+        color: white;
+        margin-bottom: 5px;
+    }
+    .hero p {
+        color: #e4f5fa;
+        font-size: 17px;
+    }
+    .section-title {
+        color: #12344d;
+        font-size: 23px;
+        font-weight: 700;
+        margin-top: 15px;
+    }
+    div[data-testid="stMetric"] {
+        background: white;
+        border: 1px solid #dce8ef;
+        padding: 18px;
+        border-radius: 14px;
+    }
+    div[data-testid="stFileUploader"] {
+        background: white;
+        padding: 15px;
+        border: 1px dashed #8bb8c8;
+        border-radius: 14px;
+    }
+    .notice {
+        background: #e6f5f4;
+        padding: 14px;
+        border-radius: 10px;
+        color: #164e52;
+        margin: 10px 0;
+    }
 </style>
 """, unsafe_allow_html=True)
 
+# Sidebar
 with st.sidebar:
     st.markdown("## 🩺 MedLens AI")
-    st.caption("Medical Imaging Intelligence")
-    st.divider()
-    st.markdown("### Project")
-    st.write("**Model:** Microsoft RAD-DINO")
-    st.write("**Backend:** FastAPI")
-    st.write("**Frontend:** Streamlit")
-    st.write("**Task:** X-ray feature extraction")
+    st.caption("Medical Imaging Research Dashboard")
     st.divider()
 
-    try:
-        health = requests.get(f"{API_URL}/", timeout=3)
-        if health.ok:
-            st.success("API Connected")
-        else:
-            st.warning("API returned an error")
-    except requests.RequestException:
-        st.error("API Offline")
-        st.caption("Start your FastAPI server.")
+    st.markdown("### Navigation")
+    st.markdown("🏠 **Image Analysis**")
+    st.markdown("🕘 **Analysis History**")
 
     st.divider()
-    st.caption("Academic demonstration only")
+    st.markdown("### AI Model")
+    st.code("microsoft/rad-dino")
+    st.caption("Research feature extraction only")
 
+# Header
 st.markdown("""
 <div class="hero">
-    <div class="eyebrow">AI-POWERED MEDICAL IMAGING</div>
-    <h1>MedLens AI</h1>
-    <p>Explore medical image features using a pretrained
-    vision model and a simple, connected AI pipeline.</p>
+    <h1>🩺 MedLens AI</h1>
+    <p>Medical image intelligence for research and exploration.</p>
+    <p>Upload a sample X-ray and extract image features with RAD-DINO.</p>
 </div>
 """, unsafe_allow_html=True)
 
-left, right = st.columns([1.05, 0.95], gap="large")
+st.markdown('<div class="section-title">📤 Upload Medical Image</div>',
+            unsafe_allow_html=True)
 
-with left:
-    st.markdown('<div class="panel">', unsafe_allow_html=True)
-    st.subheader("📤 Upload an X-ray")
-    st.write("Choose a PNG or JPEG image to begin.")
-    uploaded_file = st.file_uploader(
-        "Select image",
-        type=["png", "jpg", "jpeg"],
-        help="Use a public, de-identified sample image for this demo."
-    )
+uploaded_file = st.file_uploader(
+    "Choose an X-ray image",
+    type=["png", "jpg", "jpeg"],
+    help="Upload a sample PNG or JPEG image for this research demo."
+)
 
-    if uploaded_file:
+result = None
+
+if uploaded_file is not None:
+    left, right = st.columns([1.2, 1])
+
+    with left:
+        st.markdown("#### 📷 Image Preview")
         st.image(
-            uploaded_file.getvalue(),
+            uploaded_file,
             caption=uploaded_file.name,
             use_container_width=True
         )
-        st.caption(
-            f"File size: {len(uploaded_file.getvalue()) / 1024:.1f} KB"
+
+    with right:
+        st.markdown("#### 📋 Image Information")
+        st.write("**File name:**", uploaded_file.name)
+        st.write("**File size:**", f"{uploaded_file.size / 1024:.2f} KB")
+        st.write("**File type:**", uploaded_file.type)
+
+        st.markdown(
+            '<div class="notice">Ready for research feature extraction.</div>',
+            unsafe_allow_html=True
         )
 
-    analyze = st.button(
-        "✨ Analyze Image",
-        type="primary",
-        use_container_width=True,
-        disabled=uploaded_file is None,
-    )
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    st.markdown("""
-    <div class="panel">
-        <h4>🔬 How it works</h4>
-        <p>01 &nbsp; Upload an image</p>
-        <p>02 &nbsp; FastAPI validates the file</p>
-        <p>03 &nbsp; RAD-DINO extracts visual features</p>
-        <p>04 &nbsp; Results appear in this dashboard</p>
-    </div>
-    """, unsafe_allow_html=True)
-
-with right:
-    st.markdown('<div class="panel">', unsafe_allow_html=True)
-    st.subheader("📊 Analysis Dashboard")
-    st.write("Your processing results will appear here.")
-
-    if analyze and uploaded_file:
-        try:
-            with st.spinner("RAD-DINO is processing the image..."):
-                files = {
-                    "file": (
-                        uploaded_file.name,
-                        uploaded_file.getvalue(),
-                        uploaded_file.type
-                    )
-                }
+    if st.button("🔍 Analyze Image", type="primary", use_container_width=True):
+        with st.spinner("Loading model and extracting image features..."):
+            try:
                 response = requests.post(
-                    f"{API_URL}/analyze",
-                    files=files,
-                    timeout=180
+                    API_URL,
+                    files={
+                        "file": (
+                            uploaded_file.name,
+                            uploaded_file.getvalue(),
+                            uploaded_file.type
+                        )
+                    },
+                    timeout=300
                 )
 
-            if response.ok:
-                result = response.json()
-                st.session_state["medlens_result"] = result
-                st.session_state["medlens_error"] = None
-            else:
-                st.session_state["medlens_result"] = None
-                st.session_state["medlens_error"] = (
-                    f"API error {response.status_code}: {response.text}"
+                if response.ok:
+                    result = response.json()
+
+                    st.session_state.analysis_history.append({
+                        "filename": result.get("filename", uploaded_file.name),
+                        "model": result.get("model", "N/A"),
+                        "processing_time": result.get("processing_time_seconds", 0),
+                        "feature_length": result.get("feature_vector_length", "N/A"),
+                        "feature_shape": result.get("feature_shape", [])
+                    })
+
+                    st.success("Image feature extraction completed!")
+                else:
+                    st.error(
+                        f"Backend error ({response.status_code}): {response.text}"
+                    )
+
+            except requests.Timeout:
+                st.error("Analysis took too long. Please try again.")
+
+            except requests.RequestException:
+                st.error(
+                    "Cannot connect to the backend. Make sure FastAPI "
+                    "is running on port 8000."
                 )
 
-        except requests.RequestException as error:
-            st.session_state["medlens_result"] = None
-            st.session_state["medlens_error"] = str(error)
+# Display latest successful result
+if st.session_state.analysis_history:
+    latest = st.session_state.analysis_history[-1]
 
-    
-    result = st.session_state.get("medlens_result")
-    error = st.session_state.get("medlens_error")
+    st.divider()
+    st.markdown('<div class="section-title">📊 Latest Analysis Results</div>',
+                unsafe_allow_html=True)
 
-    if error:
-        st.error("Processing failed")
-        st.write(error)
+    st.info(
+        "This is a technical processing summary, not a clinical report "
+        "or medical diagnosis."
+    )
 
-    elif result:
-        st.success("Feature extraction completed")
+    c1, c2, c3 = st.columns(3)
 
-        size = result.get("image_size", {})
-        shape = result.get("feature_tensor_shape", [])
+    with c1:
+        st.metric("Processing Time", f"{latest['processing_time']} sec")
 
-        a, b, c = st.columns(3)
+    with c2:
+        st.metric("Feature Vector Length", latest["feature_length"])
 
-        a.metric(
-            "Feature tokens",
-            result.get("feature_count", "—")
-        )
-        b.metric(
-            "Feature dimensions",
-            result.get("feature_dimension", "—")
-        )
-        c.metric(
-            "Processing time",
-            f"{result.get('processing_time_seconds', '—')} sec"
-        )
+    with c3:
+        st.metric("Model Status", "Successful")
 
-        st.markdown("**Image dimensions**")
-        st.write(
-            f"{size.get('width', '—')} × "
-            f"{size.get('height', '—')} pixels"
-        )
+    st.write("**AI Model:**", latest["model"])
+    st.write("**Feature Shape:**", latest["feature_shape"])
 
-        st.markdown("**Feature tensor shape**")
-        st.code(str(shape), language="python")
+    st.caption(
+        "Extracted numerical features are not disease probabilities "
+        "and should not be used to make medical decisions."
+    )
 
-        st.markdown("**Processing status**")
-        st.write(result.get("analysis_status", "Unknown"))
+# Download PDF report
+if st.session_state.analysis_history:
+    st.subheader("📄 Download Technical Report")
 
-        
-        with st.expander("View complete API response"):
-            st.json(result)
+    latest_report = st.session_state.analysis_history[-1]
 
-       
-        
+    pdf_data = create_pdf_report(latest_report)
 
-        pdf_buffer = BytesIO()
-        doc = SimpleDocTemplate(pdf_buffer, pagesize=A4)
-        styles = getSampleStyleSheet()
+    st.download_button(
+        label="⬇️ Download PDF Report",
+        data=pdf_data,
+        file_name="MedLens_AI_Report.pdf",
+        mime="application/pdf",
+        use_container_width=True
+    )
 
-        story = []
-        story.append(Paragraph("MedLens AI - Analysis Report", styles["Title"]))
-        story.append(Spacer(1, 20))
-        story.append(Paragraph("Research prototype: Image feature extraction only.", styles["Normal"]))
-        story.append(Spacer(1, 12))
+# History
+st.divider()
+st.markdown('<div class="section-title">🕘 Analysis History</div>',
+            unsafe_allow_html=True)
 
-        for key, value in result.items():
-            story.append(Paragraph(f"<b>{key}</b>: {str(value)}", styles["Normal"]))
-            story.append(Spacer(1, 8))
-
-        story.append(Spacer(1, 12))
-        story.append(Paragraph(
-            "Medical diagnosis is not provided. This report is not for clinical use.",
-            styles["Italic"]
-        ))
-
-        doc.build(story)
-        pdf_buffer.seek(0)
-
-        st.download_button(
-            label="Download PDF Report",
-            data=pdf_buffer.getvalue(),
-            file_name="MedLens_Analysis_Report.pdf",
-            mime="application/pdf"
-        )
-
-
-
-    else:
-        st.info("Upload an image and select Analyze Image to see results.")
-        st.markdown("**Waiting for image**")
-        st.progress(0)
-        st.caption("No image has been analyzed in this session.")
-
-    st.markdown('</div>', unsafe_allow_html=True)
-
+if st.session_state.analysis_history:
+    for i, item in enumerate(
+        reversed(st.session_state.analysis_history), start=1
+    ):
+        with st.expander(f"{i}. {item['filename']}"):
+            st.write("**AI Model:**", item["model"])
+            st.write("**Processing Time:**", f"{item['processing_time']} sec")
+            st.write("**Feature Vector Length:**", item["feature_length"])
+            st.write("**Feature Shape:**", item["feature_shape"])
+else:
+    st.info("No analysis history yet. Upload an image and click Analyze Image.")
 
 st.divider()
+
 st.caption(
-    "MedLens AI • Student ML/DL project • "
-    "RAD-DINO feature extraction demo"
-)
-st.warning(
-    "Safety notice: This prototype extracts image features only. "
-    "It does not diagnose disease or generate a clinically validated "
-    "medical report. Do not use it for patient-care decisions."
+    "MedLens AI | Research demonstration only | "
+    "Not intended for medical diagnosis or treatment decisions."
 )

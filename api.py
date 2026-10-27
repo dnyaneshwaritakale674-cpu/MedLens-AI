@@ -1,96 +1,82 @@
-
-
 from fastapi import FastAPI, UploadFile, File, HTTPException
-from PIL import Image, UnidentifiedImageError
-from transformers import AutoImageProcessor, AutoModel
-import torch
-import io
+from PIL import Image
+from io import BytesIO
 import time
+import torch
+from transformers import AutoImageProcessor, AutoModel
 app = FastAPI(title="MedLens AI API")
-
-# Load the AI model once when the API starts
 MODEL_NAME = "microsoft/rad-dino"
 
-print("Loading RAD-DINO model...")
-processor = AutoImageProcessor.from_pretrained(MODEL_NAME)
-model = AutoModel.from_pretrained(MODEL_NAME)
-model.eval()
-print("RAD-DINO model loaded successfully!")
+processor = None
+model = None
+
+def load_model():
+    global processor, model
+
+    if model is None:
+        print("Loading RAD-DINO model...")
+
+        processor = AutoImageProcessor.from_pretrained(MODEL_NAME)
+        model = AutoModel.from_pretrained(MODEL_NAME)
+        model.eval()
+
+        print("RAD-DINO model loaded successfully!")
+
 @app.get("/")
 def home():
-    return {
-        "message": "Welcome to MedLens AI API",
-        "status": "running"
-    }
+    return {"message": "MedLens AI API is running"}
 
 
 @app.get("/health")
-def health_check():
-    return {
-        "project": "MedLens AI",
-        "api_status": "Online",
-        "model": "Microsoft RAD-DINO",
-        "model_status": "Loaded",
-        "purpose": "Medical image feature extraction",
-        "diagnosis_enabled": False
-    }
+def health():
+    return {"status": "healthy"}
+
 
 @app.post("/analyze")
-async def analyze_image(file: UploadFile = File(...)):
-    start_time = time.perf_counter()
-
+async def analyze(file: UploadFile = File(...)):
     if file.content_type not in ["image/png", "image/jpeg"]:
         raise HTTPException(
             status_code=400,
             detail="Please upload a PNG or JPEG image."
         )
 
-    image_data = await file.read()
+    start = time.time()
+    content = await file.read()
 
-    if not image_data:
+    try:
+        image = Image.open(BytesIO(content)).convert("RGB")
+    except Exception:
         raise HTTPException(
             status_code=400,
-            detail="The uploaded file is empty."
+            detail="Invalid image file."
         )
 
     try:
-        image = Image.open(io.BytesIO(image_data)).convert("RGB")
-    except (UnidentifiedImageError, OSError):
-        raise HTTPException(
-            status_code=400,
-            detail="The uploaded file is not a valid image."
-        )
+        load_model()
 
-    try:
         inputs = processor(images=image, return_tensors="pt")
 
         with torch.no_grad():
             outputs = model(**inputs)
 
         features = outputs.last_hidden_state
+        feature_vector = features.mean(dim=1).squeeze().tolist()
 
-    except Exception as error:
+    except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail="AI image processing failed."
-        ) from error
-
-    processing_time = round(time.perf_counter() - start_time, 2)
+            detail=f"RAD-DINO processing failed: {str(e)}"
+        )
 
     return {
         "filename": file.filename,
-        "message": "Image processed successfully.",
-        "analysis_status": "RAD-DINO feature extraction completed",
-        "processing_time_seconds": processing_time,
-        "image_size": {
-            "width": image.width,
-            "height": image.height
-        },
-        "feature_tensor_shape": list(features.shape),
-        "feature_count": int(features.shape[1]),
-        "feature_dimension": int(features.shape[2]),
+        "image_size": list(image.size),
+        "analysis_status": "RAD-DINO feature extraction successful",
+        "model": MODEL_NAME,
+        "feature_shape": list(features.shape),
+        "feature_vector_length": len(feature_vector),
+        "feature_preview": feature_vector[:10],
+        "processing_time_seconds": round(time.time() - start, 3),
         "medical_diagnosis": "Not provided"
     }
-
-
 
